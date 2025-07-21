@@ -3,3 +3,5 @@
 src/build/
 src/dist/
 src/*.spec
+
+**/__pycache__/
