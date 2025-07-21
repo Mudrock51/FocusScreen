@@ -9,8 +9,8 @@ class TimeState:
     - rest_time: 休息周期 | 默认设置为10秒,在短周期中,每3~5分钟就休息一个周期。
     """
     def __init__(self):
-        self.short_time = QTime(0, 0)
-        self.total_time = QTime(0, 0)
+        self.short_time = QTime(0, 0, 0)
+        self.total_time = QTime(0, 0, 0) 
         self.rest_time = QTime(0, 0, REST_TIME)
 
     # 时间递增逻辑
@@ -20,12 +20,12 @@ class TimeState:
 
     # 短周期重置逻辑
     def reset_short(self):
-        self.short_time = QTime(0, 0)
+        self.short_time = QTime(0, 0, 0)
 
     # 长周期重置逻辑
     def reset_all(self):
         self.reset_short()
-        self.total_time = QTime(0, 0)
+        self.total_time = QTime(0, 0, 0)
 
     def get_current_time(self, show_short):
         return self.short_time if show_short else self.total_time

@@ -1,18 +1,14 @@
 import os
 from PyQt5.QtWidgets import QWidget, QMenu, QAction, QSystemTrayIcon, QApplication
-from PyQt5.QtGui import QPainter, QColor, QFont, QCursor, QIcon
+from PyQt5.QtGui import QPainter, QColor, QFont, QCursor, QIcon, QPixmap
 from PyQt5.QtCore import Qt, QTimer, QTime
 
 from core.time.time_state import TimeState
 from core.time.time_logic import TimerLogic
-from core.utils.const import FOCUS_LIMIT_SECONDS, REST_TIME
+from core.utils.utils import resource_path
 
 from widget.rest.rest_overlay import RestOverlay
 from widget.setting.setting_dialog import SettingDialog
-
-# - TODO (1)悬浮框 | 右键「关闭」按键的逻辑设计与实现 
-# - TODO (2)实现「休息周期」下的全屏页面覆盖
-# - TODO (3)响铃时间(Belling)计算逻辑存在问题 | 设计算法完成修改 
 
 class TimerBall(QWidget):
     def __init__(self, state: TimeState, logic: TimerLogic, overlay: RestOverlay):
@@ -63,21 +59,16 @@ class TimerBall(QWidget):
 
         # 根据是否在休息选择显示的时间
         if self.logic.resting:
-            # 休息时显示倒计时
             time = self.state.rest_time
-            rest_seconds = time.minute() * 60 + time.second()
-            progress = 1.0 - (rest_seconds / (20 * 60 if rest_seconds > 600 else 10))  # 倒计时进度
-            # 休息时使用不同的颜色方案
-            base_color = QColor(255, 200, 200)  # 浅红色
-            target_color = QColor(255, 100, 100)  # 深红色
+            progress = 1.0
         else:
-            # 正常学习时间显示
             time = self.state.get_current_time(self.show_short)
-            sec = time.minute() * 60 + time.second()
+            sec = time.hour() * 3600 + time.minute() * 60 + time.second()
             progress = min(sec / (20 * 60 if self.show_short else 90 * 60), 1.0)
-            # 背景颜色
-            base_color = QColor(255, 255, 255) if self.show_short else QColor(173, 216, 230)
-            target_color = QColor(160, 160, 160) if self.show_short else QColor(30, 144, 255)
+
+        # 背景颜色
+        base_color = QColor(255, 255, 255) if self.show_short else QColor(173, 216, 230)
+        target_color = QColor(160, 160, 160) if self.show_short else QColor(30, 144, 255)
 
         r = int(base_color.red() + (target_color.red() - base_color.red()) * progress)
         g = int(base_color.green() + (target_color.green() - base_color.green()) * progress)
@@ -90,7 +81,11 @@ class TimerBall(QWidget):
         # 时间文本
         painter.setPen(Qt.black)
         painter.setFont(QFont('Arial', 14))
-        time_text = time.toString("mm:ss")
+        
+        tot_time = time.hour() * 3600 + time.minute() * 60 + time.second() 
+        minutes = tot_time // 60
+        seconds = tot_time % 60
+        time_text = f"{minutes:02d}:{seconds:02d}"
         if self.logic.resting:
             time_text = "休息 " + time_text
         painter.drawText(self.rect(), Qt.AlignCenter, time_text)
@@ -107,13 +102,11 @@ class TimerBall(QWidget):
         if not QSystemTrayIcon.isSystemTrayAvailable():
             return
         
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-        icon_path = os.path.join(base_dir, '../../assets/icon-app.jpg')
-        icon_path = os.path.normpath(icon_path)
+        icon_path = resource_path("src/assets/app.icon")
 
         # 创建托盘图标
         self.tray_icon = QSystemTrayIcon(self)
-        self.tray_icon.setIcon(QIcon(icon_path))
+        self.tray_icon.setIcon(QIcon(QPixmap(icon_path).scaled(35, 35)))
 
         # 创建托盘菜单
         tray_menu = QMenu()
@@ -138,7 +131,7 @@ class TimerBall(QWidget):
         self.tray_icon.showMessage(
             "专注计时器", 
             "计时器已启动，右键托盘图标查看选项",
-            QSystemTrayIcon.Information,
+            QIcon(QPixmap(icon_path).scaled(35, 35)),
             2000
         )
 
@@ -201,6 +194,15 @@ class TimerBall(QWidget):
         """结束休息周期"""
         self.overlay.hide()
 
+    def on_remind(self):
+        if hasattr(self, 'tray_icon'):
+            self.tray_icon.showMessage(
+                "专注提醒",
+                "专注时间即将结束，请整理当前工作内容。",
+                QIcon(QPixmap(resource_path("src/assets/app.icon")).scaled(35, 35)),
+                5000
+            )
+
     def show_timer(self):
         """显示计时器"""
         self.show()
@@ -215,6 +217,7 @@ class TimerBall(QWidget):
         """打开设置"""
         dlg = SettingDialog(
             focus_seconds=self.logic.focus_limit_seconds,
+            remind_threshold=self.logic.remind_threshold,
             rest_lower=self.logic.rest_lower_time,
             rest_upper=self.logic.rest_upper_time,
             rest_time=self.logic.rest_time_value
@@ -222,6 +225,7 @@ class TimerBall(QWidget):
         if dlg.exec_():
             settings = dlg.get_settings()
             self.logic.focus_limit_seconds = settings["focus_limit_seconds"]
+            self.logic.remind_threshold = settings["remind_threshold"]
             self.logic.rest_lower_time = settings["rest_lower_time"]
             self.logic.rest_upper_time = settings["rest_upper_time"]
             self.logic.rest_time_value = settings["rest_time"]
@@ -254,7 +258,6 @@ class TimerBall(QWidget):
         """重载鼠标拖动事件"""
         if self.drag_position and self.alt_pressed:
             self.move(e.globalPos() - self.drag_position)
-
     def mousePressEvent(self, e):
         """重载鼠标点击事件"""
         if e.button() == Qt.LeftButton:
@@ -267,26 +270,21 @@ class TimerBall(QWidget):
         elif e.button() == Qt.RightButton:
             # 右键显示菜单
             self.show_menu()
-    
     def mouseReleaseEvent(self, e):
         """重载鼠标释放事件"""
         self.drag_position = None
-
     def wheelEvent(self, e):
         """重载滚轮事件"""
         self.show_short = not self.show_short
         self.display_mode_timer.start()
-
     def enterEvent(self, e):
         """启动事件"""
         self.hover = True
         self.repaint()
-
     def leaveEvent(self, e):
         """离开事件"""
         self.hover = False
         self.repaint()
-
     def closeEvent(self, event):
         """窗口关闭事件"""
         if hasattr(self, 'tray_icon') and self.tray_icon.isVisible():
@@ -294,15 +292,12 @@ class TimerBall(QWidget):
             event.ignore()  # 忽略关闭事件，改为隐藏
         else:
             event.accept()
-
     def keyPressEvent(self, e):
         if e.key() == Qt.Key_Alt:
             self.alt_pressed = True
-
     def keyReleaseEvent(self, e):
         if e.key() == Qt.Key_Alt:
             self.alt_pressed = False
-
     def close(self):
         """关闭计时器球(隐藏)"""
         self.hide_timer()
