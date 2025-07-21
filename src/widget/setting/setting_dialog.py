@@ -1,12 +1,20 @@
 from PyQt5.QtWidgets import QLabel, QDialog, QFormLayout, QSpinBox, QPushButton, QHBoxLayout
 
-from core.utils.const import FOCUS_LIMIT_SECONDS, REST_TIME
+from core.utils.const import FOCUS_LIMIT_SECONDS, REST_TIME, REMIND_THRESHOLD
 
 class SettingDialog(QDialog):
-    def __init__(self, focus_seconds=FOCUS_LIMIT_SECONDS, rest_lower=3*60, rest_upper=5*60, rest_time=REST_TIME, parent=None):
+    def __init__(
+            self, 
+            focus_seconds=FOCUS_LIMIT_SECONDS, 
+            remind_threshold=REMIND_THRESHOLD,
+            rest_lower=3*60, 
+            rest_upper=5*60, 
+            rest_time=REST_TIME, 
+            parent=None
+        ):
         super().__init__(parent)
         self.setWindowTitle("专注设置")
-        self.setFixedSize(340, 155)
+        self.setFixedSize(340, 170)
         layout = QFormLayout(self)
 
         ### 专注总时长
@@ -25,6 +33,20 @@ class SettingDialog(QDialog):
         focus_layout.addWidget(QLabel("秒"))
         # 在 SettingDialog 页面下作为一个新的 Row 添加上去
         layout.addRow("专注总时长：", focus_layout)
+
+        ### 专注提醒阈值
+        remind_layout = QHBoxLayout()
+        self.remind_min = QSpinBox(self)
+        self.remind_min.setRange(1, 20)
+        self.remind_min.setValue(remind_threshold // 60)
+        self.remind_sec = QSpinBox(self)
+        self.remind_sec.setRange(0, 59)
+        self.remind_sec.setValue(remind_threshold % 60)
+        remind_layout.addWidget(self.remind_min)
+        remind_layout.addWidget(QLabel("分:"))
+        remind_layout.addWidget(self.remind_sec)
+        remind_layout.addWidget(QLabel("秒"))
+        layout.addRow("专注提醒阈值：", remind_layout)
 
         # 专注时间下限
         lower_layout = QHBoxLayout()
@@ -76,11 +98,13 @@ class SettingDialog(QDialog):
 
     def get_settings(self):
         focus_limit_seconds = self.focus_min.value() * 60 + self.focus_sec.value()
+        remind_threshold = self.remind_min.value() * 60 + self.remind_sec.value()
         rest_lower_time = self.lower_min.value() * 60 + self.lower_sec.value()
         rest_upper_time = self.upper_min.value() * 60 + self.upper_sec.value()
         rest_time = self.rest_sec.value()
         return {
             "focus_limit_seconds": focus_limit_seconds,
+            "remind_threshold": remind_threshold,
             "rest_lower_time": rest_lower_time,
             "rest_upper_time": rest_upper_time,
             "rest_time": rest_time

@@ -29,7 +29,8 @@ if __name__ == '__main__':
         callback_resume=window.on_timer_resume,
         callback_update_ui=window.on_timer_update,
         callback_rest_start=window.on_rest_start,
-        callback_rest_end=window.on_rest_end
+        callback_rest_end=window.on_rest_end,
+        callback_remind=window.on_remind
     )
 
     sys.exit(app.exec_())
