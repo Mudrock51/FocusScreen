@@ -26,7 +26,7 @@ class RestOverlay(QWidget):
         # 读取并随机选择背景图片
         # base_dir = os.path.dirname(os.path.abspath(__file__))
         # images_dir = os.path.join(base_dir, '../../assets/rest')
-        images_dir = resource_path("assets/rest")
+        images_dir = resource_path("src/assets/rest")
         images_dir = os.path.normpath(images_dir)
         image_list = get_image_list(images_dir)
         if image_list:

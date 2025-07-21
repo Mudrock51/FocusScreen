@@ -8,7 +8,7 @@ import random
 class SoundPlayer:
     def __init__(self):
         # 随机提示音目录
-        self.sound_dir = resource_path("assets/wav")
+        self.sound_dir = resource_path("src/assets/wav")
         # 随机提示音集合
         self.sound_list = get_sound_list(self.sound_dir)
 
