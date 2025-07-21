@@ -1,5 +1,7 @@
 from PyQt5.QtCore import QTime
 
+from core.utils.const import REST_TIME
+
 class TimeState:
     """定义时间状态
     - short_time: 短周期 | 记录每个短周期学习时间。
@@ -9,7 +11,7 @@ class TimeState:
     def __init__(self):
         self.short_time = QTime(0, 0)
         self.total_time = QTime(0, 0)
-        self.rest_time = QTime(0, 0, 10)
+        self.rest_time = QTime(0, 0, REST_TIME)
 
     # 时间递增逻辑
     def increment(self):

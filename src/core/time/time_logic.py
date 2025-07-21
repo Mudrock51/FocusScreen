@@ -1,17 +1,26 @@
 from PyQt5.QtCore import QTimer
+
 from core.time.time_state import TimeState
+from core.sound.sound_player import SoundPlayer
+
+from core.utils.const import FOCUS_LIMIT_SECONDS, REST_TIME
+
 import random
 
 
 class TimerLogic:
-    def __init__(self, state: TimeState, sound_player=None):
+    def __init__(self, state: TimeState, sound_player: SoundPlayer):
         # Timer 状态
         self.state = state
         self.running = False
         self.resting = False
+        self.rest_bell_played = False
 
         # Timer 默认时间设置
-        self.focus_limit_seconds = 90 * 60
+        self.focus_limit_seconds = FOCUS_LIMIT_SECONDS
+        self.rest_lower_time = 3 * 60
+        self.rest_upper_time = 5 * 60
+        self.rest_time_value = REST_TIME
         self.next_bell_seconds = self._random_interval()
         self.last_bell_seconds = 0
 
@@ -20,7 +29,7 @@ class TimerLogic:
         self.timer.timeout.connect(self.tick)
 
         # 播放器
-        self.sound_player = sound_player
+        self.sound_player = sound_player if sound_player else None
 
     # 操作回调
     def set_callbacks(self, callback_pause, callback_resume, callback_update_ui, callback_rest_start, callback_rest_end):
@@ -32,8 +41,7 @@ class TimerLogic:
 
     # 随机数产生下一次休息时间
     def _random_interval(self):
-        return random.randint(3, 5) # Testing
-        # return random.randint(3 * 60, 5 * 60)
+        return random.randint(self.rest_lower_time, self.rest_upper_time)
     
     def start(self):
         if not self.running:
@@ -53,18 +61,18 @@ class TimerLogic:
             self.callback_resume()
 
     def tick(self):
-        """时间更新逻辑(Timer 每秒触发一次)
-        """
+        """时间更新逻辑(Timer 每秒触发一次)"""
         if self.resting:
-            # 处于长休息周期
-            # QTime.addSecs(-1) 倒计时1秒
-            self.state.rest_time = self.state.rest_time.addSecs(-1)
-            if self.state.rest_time.second() <= 0:
-                # 休息结束
+            # 处于休息周期
+            if self.state.rest_time.minute() > 0 or self.state.rest_time.second() > 0:
+                self.state.rest_time = self.state.rest_time.addSecs(-1)
+            else:
+                # rest_time 变成 00:00, 退出休息
                 self.resting = False
-                self.state.rest_time.setHMS(0, 0, 10)
-                self.callback_rest_end()
-                self.callback_resume()
+                self.rest_bell_played = False
+                self.state.rest_time.setHMS(0, 0, self.rest_time_value)
+                if self.callback_rest_end:
+                    self.callback_rest_end()
         else:
             # 处于学习周期
             self.state.increment()
@@ -73,30 +81,33 @@ class TimerLogic:
             # 长休息临界值
             if current_seconds >= self.focus_limit_seconds:
                 self.pause()
-                self.state.short_time.setHMS(0, 20, 0)
-                self.state.total_time.setHMS(0, 20, 0)
+                # 默认长休息20分钟
+                # TODO 休息 20 分钟锁屏还是太变态了一点 ~
+                self.state.rest_time.setHMS(0, 20, 0)
                 self.resting = True
-                self.callback_pause()
+                self.rest_bell_played = False
+                if self.callback_rest_start:
+                    self.callback_rest_start()
+                if self.callback_pause:
+                    self.callback_pause()
                 return
-            
+
             # 短休息随机值
             if current_seconds - self.last_bell_seconds >= self.next_bell_seconds:
-                
                 self.last_bell_seconds = current_seconds
                 self.resting = True
-                self.state.rest_time.setHMS(0, 0, 10)
-
-                # 切换休息页面
+                self.rest_bell_played = False
+                self.state.rest_time.setHMS(0, 0, self.rest_time_value)
                 self.callback_rest_start()
-
-                # 下一次响铃随机数
                 self.next_bell_seconds = self._random_interval()
-
-                # 响铃
-                if self.sound_player:
-                    self.sound_player.play()
                 self.callback_pause()
-        
-        # 每次tick都更新UI
-        if hasattr(self, 'callback_update_ui'):
+
+        # 只在进入休息的 tick 播放一次
+        if self.resting and not self.rest_bell_played:
+            if self.sound_player:
+                self.sound_player.play()
+            self.rest_bell_played = True
+
+        # 每次 tick 都更新界面
+        if self.callback_update_ui:
             self.callback_update_ui()

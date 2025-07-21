@@ -3,8 +3,10 @@ from PyQt5.QtWidgets import QApplication
 
 from widget.timer.timer_ball import TimerBall
 from widget.rest.rest_overlay import RestOverlay
+
 from core.time.time_state import TimeState
 from core.time.time_logic import TimerLogic
+from core.sound.sound_player import SoundPlayer
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
@@ -13,8 +15,9 @@ if __name__ == '__main__':
     app.setQuitOnLastWindowClosed(False)
 
     # 初始化状态和逻辑
+    sound_player = SoundPlayer()
     time_state = TimeState()
-    time_logic = TimerLogic(time_state)
+    time_logic = TimerLogic(time_state, sound_player)
     rest_overlay = RestOverlay(time_state, time_logic)
 
     # 创建 UI 组件

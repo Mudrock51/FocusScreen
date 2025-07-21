@@ -1,14 +1,17 @@
 import os
 from PyQt5.QtWidgets import QWidget, QMenu, QAction, QSystemTrayIcon, QApplication
 from PyQt5.QtGui import QPainter, QColor, QFont, QCursor, QIcon
-from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtCore import Qt, QTimer, QTime
 
 from core.time.time_state import TimeState
 from core.time.time_logic import TimerLogic
+from core.utils.const import FOCUS_LIMIT_SECONDS, REST_TIME
+
 from widget.rest.rest_overlay import RestOverlay
+from widget.setting.setting_dialog import SettingDialog
 
 # - TODO (1)悬浮框 | 右键「关闭」按键的逻辑设计与实现 
-# TODO (2)实现「休息周期」下的全屏页面覆盖
+# - TODO (2)实现「休息周期」下的全屏页面覆盖
 # - TODO (3)响铃时间(Belling)计算逻辑存在问题 | 设计算法完成修改 
 
 class TimerBall(QWidget):
@@ -144,6 +147,9 @@ class TimerBall(QWidget):
         """右键功能栏"""
         menu = QMenu(self)
 
+        setting_action = QAction("设置", self)
+        setting_action.triggered.connect(lambda: self.open_setting())
+
         reset_short = QAction("重置短周期", self)
         reset_short.triggered.connect(lambda: self.state.reset_short())
 
@@ -156,6 +162,8 @@ class TimerBall(QWidget):
         quit_action = QAction("退出", self)
         quit_action.triggered.connect(lambda: self.quit_app())
 
+        menu.addAction(setting_action)
+        menu.addSeparator()
         menu.addAction(reset_short)
         menu.addAction(reset_all)
         menu.addSeparator()
@@ -202,6 +210,23 @@ class TimerBall(QWidget):
     def hide_timer(self):
         """隐藏计时器"""
         self.hide()
+
+    def open_setting(self):
+        """打开设置"""
+        dlg = SettingDialog(
+            focus_seconds=self.logic.focus_limit_seconds,
+            rest_lower=self.logic.rest_lower_time,
+            rest_upper=self.logic.rest_upper_time,
+            rest_time=self.logic.rest_time_value
+        )
+        if dlg.exec_():
+            settings = dlg.get_settings()
+            self.logic.focus_limit_seconds = settings["focus_limit_seconds"]
+            self.logic.rest_lower_time = settings["rest_lower_time"]
+            self.logic.rest_upper_time = settings["rest_upper_time"]
+            self.logic.rest_time_value = settings["rest_time"]
+            self.state.rest_time = QTime(0, 0, self.logic.rest_time_value)
+            self.logic.next_bell_seconds = self.logic._random_interval()
 
     def quit_app(self):
         """完全退出应用"""
